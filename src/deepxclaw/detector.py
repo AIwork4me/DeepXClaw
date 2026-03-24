@@ -21,7 +21,7 @@ class DeepXDetector:
                       If provided, prepended to PATH before importing dx_engine.
         """
         if dxrt_bin:
-            os.environ["PATH"] = str(dxrt_bin) + ";" + os.environ["PATH"]
+            os.environ["PATH"] = str(dxrt_bin) + os.pathsep + os.environ["PATH"]
 
         from dx_engine import InferenceEngine
 

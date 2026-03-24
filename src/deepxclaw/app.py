@@ -53,7 +53,7 @@ def create_app():
     config = load_config()
     dxrt_bin = config.get("dxrt_bin", "")
     if dxrt_bin:
-        os.environ["PATH"] = str(dxrt_bin) + ";" + os.environ["PATH"]
+        os.environ["PATH"] = str(dxrt_bin) + os.pathsep + os.environ["PATH"]
 
     model_path = config.get(
         "model_path",
@@ -73,83 +73,93 @@ def create_app():
 
     def _detection_worker():
         """Background thread: open camera -> load NPU -> detection loop."""
-        from .camera import Camera
-        from .detector import DeepXDetector
-
-        with state["lock"]:
-            state["status"] = "Opening camera..."
-
-        cam = Camera(device_id=0, width=640, height=480)
-        if not cam.start():
-            with state["lock"]:
-                state["status"] = "ERROR: Cannot open webcam"
-                state["running"] = False
-            return
-
-        with state["lock"]:
-            state["status"] = "Loading NPU model..."
-
         try:
-            detector = DeepXDetector(model_path=model_path, dxrt_bin=dxrt_bin if dxrt_bin else None)
-        except Exception as e:
-            cam.stop()
+            from .camera import Camera
+            from .detector import DeepXDetector
+
             with state["lock"]:
-                state["status"] = f"ERROR: {e}"
-                state["running"] = False
-            return
+                state["status"] = "Opening camera..."
 
-        with state["lock"]:
-            state["status"] = "Running"
-            state["frame_count"] = 0
-            state["fps_time"] = time.time()
+            cam = Camera(device_id=0, width=640, height=480)
+            if not cam.start():
+                with state["lock"]:
+                    state["status"] = "ERROR: Cannot open webcam"
+                    state["running"] = False
+                return
 
-        while state["running"]:
-            frame = cam.read()
-            if frame is None:
-                time.sleep(0.005)
-                continue
+            with state["lock"]:
+                state["status"] = "Loading NPU model..."
+
             try:
-                detections, latency = detector.detect(frame)
-                annotated = draw_detections(frame, detections)
-                rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-                state["frame_count"] += 1
-                state["last_latency"] = latency
-                elapsed = time.time() - state["fps_time"]
-                if elapsed >= 1.0:
-                    state["fps_display"] = state["frame_count"] / elapsed
-                    state["frame_count"] = 0
-                    state["fps_time"] = time.time()
-                with state["lock"]:
-                    state["latest_rgb"] = rgb
-                    state["status"] = (
-                        f"Running | FPS: {state['fps_display']:.1f} | "
-                        f"Latency: {latency:.1f}ms | Objects: {len(detections)}"
-                    )
+                detector = DeepXDetector(model_path=model_path, dxrt_bin=dxrt_bin if dxrt_bin else None)
             except Exception as e:
+                cam.stop()
                 with state["lock"]:
-                    state["status"] = f"Error: {e}"
-                break
+                    state["status"] = f"ERROR: {e}"
+                    state["running"] = False
+                return
 
-        cam.stop()
-        detector.dispose()
-        with state["lock"]:
-            state["latest_rgb"] = None
-            if state["running"]:
-                state["status"] = "Stopped"
-            state["running"] = False
+            with state["lock"]:
+                state["status"] = "Running"
+                state["frame_count"] = 0
+                state["fps_time"] = time.time()
+
+            while state["running"]:
+                frame = cam.read()
+                if frame is None:
+                    time.sleep(0.005)
+                    continue
+                try:
+                    detections, latency = detector.detect(frame)
+                    annotated = draw_detections(frame, detections)
+                    rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+                    state["frame_count"] += 1
+                    state["last_latency"] = latency
+                    elapsed = time.time() - state["fps_time"]
+                    if elapsed >= 1.0:
+                        state["fps_display"] = state["frame_count"] / elapsed
+                        state["frame_count"] = 0
+                        state["fps_time"] = time.time()
+                    with state["lock"]:
+                        state["latest_rgb"] = rgb
+                        state["status"] = (
+                            f"Running | FPS: {state['fps_display']:.1f} | "
+                            f"Latency: {latency:.1f}ms | Objects: {len(detections)}"
+                        )
+                except Exception as e:
+                    with state["lock"]:
+                        state["status"] = f"Error: {e}"
+                    break
+
+            cam.stop()
+            detector.dispose()
+            with state["lock"]:
+                state["latest_rgb"] = None
+                if state["running"]:
+                    state["status"] = "Stopped"
+                state["running"] = False
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            with state["lock"]:
+                state["status"] = f"FATAL: {e}"
+                state["running"] = False
 
     def on_start():
-        """Toggle start - returns status instantly, heavy work in background."""
+        """Toggle start - sets state, heavy work in background thread."""
         if state["running"]:
-            return "Already running"
+            return
+        with state["lock"]:
+            state["status"] = "Starting..."
         state["running"] = True
         threading.Thread(target=_detection_worker, daemon=True).start()
-        return "Starting..."
 
     def on_stop():
-        """Toggle stop - returns instantly."""
+        """Toggle stop - sets state instantly."""
+        with state["lock"]:
+            state["status"] = "Stopping..."
         state["running"] = False
-        return "Stopping..."
 
     def poll():
         """Timer poll - reads latest frame from shared state."""
@@ -177,32 +187,17 @@ def create_app():
         timer.tick(fn=poll, outputs=[video, status_text])
 
         # Buttons update status text only (instant, lightweight)
-        btn_start.click(fn=on_start, outputs=[status_text])
-        btn_stop.click(fn=on_stop, outputs=[status_text])
+        btn_start.click(fn=on_start)
+        btn_stop.click(fn=on_stop)
         btn_screenshot.click(fn=screenshot, inputs=[video], outputs=[video, status_text])
 
     return app
 
 
 def main():
-    import gradio.networking as _gn
-    _orig_url_ok = getattr(_gn, "url_ok", None)
-    if _orig_url_ok:
-        _gn.url_ok = lambda url: True
-    import httpx as _hx
-    _orig_get = _hx.get
-    def _safe_get(url, **kw):
-        if "startup-events" in str(url):
-            return _hx.Response(200, request=_hx.Request("GET", url))
-        return _orig_get(url, **kw)
-    _hx.get = _safe_get
-    try:
-        app = create_app()
-        app.launch(server_name="0.0.0.0", server_port=7860)
-    finally:
-        _hx.get = _orig_get
-        if _orig_url_ok:
-            _gn.url_ok = _orig_url_ok
+    os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
+    app = create_app()
+    app.launch(server_name="0.0.0.0", server_port=7860, share=False)
 
 
 if __name__ == "__main__":
