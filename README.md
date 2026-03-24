@@ -1,89 +1,196 @@
-# DeepXClaw - YOLOv26 + DeepX M1 NPU Real-time Object Detection
+<div align="center">
 
-Real-time object detection WebUI powered by DeepX M1 NPU (3 cores, 3.92 GiB LPDDR5).
+# DeepXClaw
 
-## Features
+**YOLOv26 + DeepX M1 NPU | Real-time Object Detection at 25ms**
 
-- **YOLOv26n** model optimized for DeepX M1 NPU
-- **~25ms inference latency** on NPU
-- **Gradio WebUI** for easy interaction
-- **USB Webcam** support with threaded capture
+[![License](https://img.shields.io/github/license/AIwork4me/DeepXClaw?color=blue)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue?logo=python&logoColor=gold)](https://www.python.org/)
+[![Stars](https://img.shields.io/github/stars/AIwork4me/DeepXClaw?style=social)](https://github.com/AIwork4me/DeepXClaw/stargazers)
 
-## Requirements
+<br>
 
-- Windows 10/11
-- DeepX M1 NPU hardware
-- DeepX Runtime v3.2.0+
-- Python 3.10+
-- USB Webcam
+<img src="https://img.shields.io/badge/YOLOv26n-Ultralytics-00FFFF?logo=yolo&logoColor=white" alt="YOLOv26">
+<img src="https://img.shields.io/badge/NPU-DeepX_M1-FF6F00" alt="DeepX M1">
+<img src="https://img.shields.io/badge/Inference-25ms-brightgreen" alt="25ms">
+<img src="https://img.shields.io/badge/Throughput-30_FPS-brightgreen" alt="30 FPS">
+<img src="https://img.shields.io/badge/Power-15W_TDP-orange" alt="15W">
+<img src="https://img.shields.io/badge/UI-Gradio_5-F97316?logo=gradio&logoColor=white" alt="Gradio">
 
-## Installation
+<br>
+
+**English** | [中文](README_CN.md)
+
+<br><br>
+
+<img width="80%" src="screenshots/20260324-191357.png" alt="DeepXClaw Demo — YOLOv26 real-time detection on DeepX M1 NPU">
+
+<br>
+
+*Real-time COCO 80-class object detection — USB webcam to annotated display in ~35ms end-to-end*
+
+</div>
+
+<br>
+
+## ✨ Highlights
+
+- **25ms NPU inference** — YOLOv26n on DeepX M1 (3 cores, LPDDR5 3.92 GiB, PCIe Gen3 x4)
+- **~30 FPS end-to-end** — camera capture, NPU inference, NMS, and live display at 15W power
+- **One-command launch** — Gradio WebUI at `localhost:7860`, no ML expertise needed
+- **Zero-copy pipeline** — threaded camera capture with frame-drop queue keeps latency low
+- **80-class detection** — full COCO label set with per-class NMS (IoU 0.45, confidence 0.25)
+
+## 📊 Performance
+
+> Benchmarks: YOLOv26n 640×640, USB webcam 720p input, DeepX M1 NPU, Windows 11.
+
+| Metric | Value |
+|:-------|------:|
+| NPU inference latency | **~25 ms** |
+| End-to-end latency | **~35 ms** |
+| Throughput | **~30 FPS** |
+| Max detections per frame | 300 |
+| Model input | 640×640 RGB uint8 |
+| Power consumption | 15W TDP |
+
+## 🚀 Quick Start
+
+<details open>
+<summary><b>Prerequisites</b></summary>
+
+| Requirement | Version |
+|:------------|:--------|
+| OS | Windows 10 / 11 |
+| Hardware | DeepX M1 NPU (PCIe) |
+| Runtime | DeepX Runtime v3.2.0+ |
+| Python | 3.10+ |
+| Camera | USB Webcam |
+
+</details>
+
+<details open>
+<summary><b>Install & Run</b></summary>
 
 ```bash
-# Clone the repo
-git clone https://github.com/Tinkerclaw/deepxclaw.git
-cd deepxclaw
+git clone https://github.com/AIwork4me/DeepXClaw.git
+cd DeepXClaw
 
-# Install dependencies with uv
+# Install dependencies
 pip install uv
 uv sync
 
-# Copy model to models/
-# yolo26n-1.dxnn should be placed in models/
+# Place your compiled NPU model
+cp /path/to/yolo26n-1.dxnn models/
 
-# Create config
+# Configure local paths
 cp .deepxclaw.json.example .deepxclaw.json
-# Edit .deepxclaw.json with your local paths
+# Edit .deepxclaw.json — set dxrt_bin and model_path
 
-# Run
-uv run python -m deepxclaw.app
+# Launch
+uv run deepxclaw
 ```
 
-## Project Structure
+Open **http://localhost:7860** → click **Start** → see real-time detections.
+
+</details>
+
+<details>
+<summary><b>Configuration (.deepxclaw.json)</b></summary>
+
+```json
+{
+  "dxrt_bin": "C:/path/to/dx_rt_windows/m1/v3.2.0/dx_rt/bin",
+  "model_path": "models/yolo26n-1.dxnn",
+  "sdk_repo": "C:/path/to/dx_rt_windows",
+  "fw_repo": "C:/path/to/dx_fw",
+  "models_cdn": "https://example.com/models"
+}
+```
+
+| Field | Description |
+|:------|:------------|
+| `dxrt_bin` | Path to DeepX Runtime binaries (contains `dxrt.dll`) |
+| `model_path` | Path to compiled `.dxnn` model file |
+| `sdk_repo` | DeepX SDK repository root |
+| `fw_repo` | DeepX firmware repository root |
+| `models_cdn` | CDN URL for downloading pre-compiled models |
+
+</details>
+
+## 🏗️ Architecture
 
 ```
-deepxclaw/
+┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────┐
+│ USB      │    │ Threaded     │    │ DeepX M1     │    │ Per-class    │    │ Gradio   │
+│ Webcam   │───>│ Capture      │───>│ NPU          │───>│ NMS          │───>│ WebUI    │
+│          │    │ (camera.py)  │    │ (detector.py)│    │ (postproc.py)│    │ (app.py) │
+└──────────┘    └──────────────┘    └──────────────┘    └──────────────┘    └──────────┘
+  720p BGR       Queue(max=2)        640×640 uint8       IoU 0.45           Timer 100ms
+                 drop-old-frames     [1,300,6] output    conf ≥ 0.25        poll & render
+```
+
+**Threading model**: Camera capture runs in a daemon thread with a 2-frame queue (stale frames dropped). NPU inference runs in a separate detection worker thread. The Gradio UI polls the latest annotated frame every 100ms via `gr.Timer`, ensuring smooth display without blocking the inference pipeline.
+
+## 📁 Project Structure
+
+<details>
+<summary>Click to expand</summary>
+
+```
+DeepXClaw/
 ├── src/deepxclaw/
-│   ├── __init__.py
-│   ├── app.py          # Gradio WebUI
-│   ├── camera.py       # Threaded webcam capture
-│   ├── detector.py     # DeepX NPU inference
-│   ├── labels.py       # COCO class labels & colors
-│   └── postprocess.py  # YOLO NMS post-processing
-├── models/             # NPU models (.dxnn)
-├── pyproject.toml
+│   ├── __init__.py          # Package version
+│   ├── app.py               # Gradio WebUI + detection worker thread
+│   ├── camera.py            # Threaded USB webcam capture (OpenCV)
+│   ├── detector.py          # DeepX M1 NPU inference (dx_engine)
+│   ├── labels.py            # COCO 80-class labels + color palette
+│   └── postprocess.py       # YOLOv26n output decode + NMS
+├── models/                  # NPU model files (.dxnn) — gitignored
+├── screenshots/             # Demo screenshots
+├── .deepxclaw.json.example  # Config template
+├── pyproject.toml           # Dependencies & CLI entry point
 └── README.md
 ```
 
-## Hardware
+</details>
 
-- **NPU**: DeepX M1 (3 cores, LPDDR5 3.92 GiB)
-- **Interface**: PCIe Gen3 x4
-- **Power**: 15W TDP
+## 🔩 DeepX M1 NPU Specs
 
-## Model
+| Spec | Detail |
+|:-----|:-------|
+| Cores | 3 NPU cores |
+| Memory | LPDDR5 3.92 GiB |
+| Interface | PCIe Gen3 x4 |
+| Power | 15W TDP |
+| Model format | `.dxnn` (compiled from ONNX) |
 
-- **Architecture**: YOLOv26n
-- **Input**: 640x640 RGB uint8
-- **Output**: 300 detections max (cx, cy, w, h, conf, class_id)
-- **Classes**: COCO 80 classes
+## 🤝 Contributing
 
-## Performance
+Contributions are welcome! Feel free to open issues or submit pull requests.
 
-| Metric | Value |
-|--------|-------|
-| Inference latency | ~25ms |
-| End-to-end latency | ~35ms |
-| Throughput | ~30 FPS |
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## License
+## 📜 License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
 
-## Developed by
+## 🙏 Acknowledgments
 
-**OpenClaw** - AI Agent Platform
+- [Ultralytics](https://github.com/ultralytics/ultralytics) — YOLOv26 architecture
+- [DeepX](https://www.deepx.ai/) — M1 NPU hardware & runtime SDK
+- [Gradio](https://gradio.app/) — WebUI framework
 
 ---
 
-*This project is a demo for DeepX M1 NPU capabilities.*
+<div align="center">
+
+**Built by [OpenClaw](https://github.com/AIwork4me)** — AI Agent Platform
+
+If this project helped you, consider giving it a ⭐
+
+</div>
