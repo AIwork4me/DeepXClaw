@@ -1,0 +1,28 @@
+[project]
+name = "deepxclaw"
+version = "0.1.0"
+description = "E2E Agent helps you from installation to product shipping based on DeepX chip"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "gradio>=5.0,<6.0",
+    "opencv-python>=4.8",
+    "numpy>=1.26",
+    "uvicorn>=0.30,<0.32",
+    "httpx>=0.24,<0.28",
+]
+
+[project.scripts]
+deepxclaw = "deepxclaw.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deepxclaw"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

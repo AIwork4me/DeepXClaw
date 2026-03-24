@@ -1,0 +1,7 @@
+{
+  "dxrt_bin": "C:/path/to/dx_rt_windows/m1/v3.2.0/dx_rt/bin",
+  "model_path": "models/yolo26n-1.dxnn",
+  "sdk_repo": "C:/path/to/dx_rt_windows",
+  "fw_repo": "C:/path/to/dx_fw",
+  "models_cdn": "https://example.com/models"
+}
