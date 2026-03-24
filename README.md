@@ -6,15 +6,12 @@
 
 <br>
 
-<img src="https://img.shields.io/badge/Human_Code-0_Lines-blueviolet?style=for-the-badge" alt="0 Lines of Code">
-<img src="https://img.shields.io/badge/Built_by-OpenClaw_Agent-FF6F00?style=for-the-badge" alt="OpenClaw">
-<img src="https://img.shields.io/badge/Result-30_FPS_Detection-brightgreen?style=for-the-badge" alt="30 FPS">
-
-<br><br>
-
 [![License](https://img.shields.io/github/license/AIwork4me/DeepXClaw?color=blue)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue?logo=python&logoColor=gold)](https://www.python.org/)
 [![Stars](https://img.shields.io/github/stars/AIwork4me/DeepXClaw?style=social)](https://github.com/AIwork4me/DeepXClaw/stargazers)
+<img src="https://img.shields.io/badge/Human_Code-0_Lines-blueviolet" alt="0 Lines of Code">
+<img src="https://img.shields.io/badge/Built_by-OpenClaw_Agent-FF6F00" alt="OpenClaw">
+<img src="https://img.shields.io/badge/Result-30_FPS_Detection-brightgreen" alt="30 FPS">
 
 <br>
 
